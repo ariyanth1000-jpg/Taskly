@@ -1,4 +1,4 @@
-# Version 6.2 - Fixed Student ID Extraction & Colorful UI
+# Version 6.5 - Render Deployment Fixed (Env Variables Support)
 
 import asyncio
 import re
@@ -10,11 +10,27 @@ from telethon.sessions import StringSession
 
 app = Flask(__name__)
 
+# ==========================================
+# Render & Local Config Loader
+# ==========================================
+# প্রথমে Render-এর Environment Variables চেক করবে
 api_id = int(os.environ.get('API_ID', 0))
 api_hash = os.environ.get('API_HASH', '') 
 session_str = os.environ.get('SESSION_STR', '')
+
+# যদি Render-এ ভেরিয়েবল সেট না করা থাকে, তবে config.py থেকে লোড করবে
+if api_id == 0 or not api_hash:
+    try:
+        import config
+        api_id = config.API_ID
+        api_hash = config.API_HASH
+        session_str = config.SESSION_STR
+    except ImportError:
+        print("Warning: config.py not found and Environment Variables are missing!")
+
 TARGET_BOT = '@Taskl1_bot'
 
+# Telethon ক্লায়েন্ট
 client = TelegramClient(StringSession(session_str), api_id, api_hash)
 
 clicked_buttons = set()
@@ -89,11 +105,9 @@ async def sync_reports_from_telegram():
             if 'ds_user_id' in text:
                 student_id = None
                 
-                # Try from pending queue first
                 if pending_student_ids:
                     student_id = pending_student_ids.pop(0)
                 
-                # If queue is empty or out of sync, look backward in chat history
                 if not student_id:
                     for j in range(i - 1, max(-1, i - 30), -1):
                         if j < 0: break
@@ -104,9 +118,8 @@ async def sync_reports_from_telegram():
                         if not prev_text: continue
                         if "Account registered" in prev_text: continue
                         if "subscriptions" in prev_text: continue
-                        if "ds_user_id" in prev_text: continue # Skip cookies
+                        if "ds_user_id" in prev_text: continue 
                         
-                        # Found the Student ID / Name
                         student_id = prev_text
                         break
 
@@ -236,7 +249,6 @@ HTML_PAGE = '''
     <title>Telegram Control Panel</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        /* Colorful Background */
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
             padding: 10px; 
@@ -245,7 +257,6 @@ HTML_PAGE = '''
             min-height: 100vh;
         }
 
-        /* Unified Display Container - Highlighted */
         .unified-display {
             background: linear-gradient(to bottom, #ffffff, #e3f2fd);
             border: 3px solid #64b5f6;
@@ -272,7 +283,6 @@ HTML_PAGE = '''
             text-shadow: 1px 1px 2px rgba(0,0,0,0.05);
         }
 
-        /* Student ID Area */
         .sid-area { width: 100%; display: flex; gap: 6px; justify-content: center; }
         .student-id-input { 
             flex: 1; padding: 12px; border: 2px solid #ff9800; border-radius: 10px;
@@ -295,7 +305,6 @@ HTML_PAGE = '''
         }
         .sid-title { font-size: 18px; font-weight: 900; color: #2e7d32; letter-spacing: 1px; text-align: center; width: 100%; text-shadow: 1px 1px 1px white;}
 
-        /* Status Area */
         .status-area { width: 100%; min-height: 45px; display: flex; align-items: center; justify-content: center; }
         .welcome-msg { display: block; color: #0277bd; font-size: 15px; font-weight: bold; text-align: center; white-space: nowrap; text-shadow: 1px 1px 1px white;}
         
@@ -322,7 +331,6 @@ HTML_PAGE = '''
         
         .copied-msg { font-size: 12px; color: #2e7d32; font-weight: bold; display: none; position: absolute; right: 15px; top: 10px; }
 
-        /* Action Row */
         .action-row { display: flex; gap: 10px; align-items: center; width: 100%; margin-top: 5px; }
         
         .send-all-2fa-btn { 
@@ -343,7 +351,6 @@ HTML_PAGE = '''
         }
         .sid-lock-btn-small:hover { background: #e3f2fd; transform: scale(1.05); border-color: #42a5f5; }
 
-        /* Manual Submit Area */
         .manual-area { 
             background: linear-gradient(to bottom right, #e8f5e9, #c8e6c9); 
             padding: 15px; border-radius: 12px; margin-bottom: 12px; 
@@ -376,7 +383,6 @@ HTML_PAGE = '''
         .follow-checkbox { width: 20px; height: 20px; cursor: pointer; accent-color: #43a047; }
         .follow-hint { font-size: 10px; color: #757575; font-style: italic; }
 
-        /* Report Analytics Area */
         .report-area { 
             background: #ffffff; padding: 15px; border-radius: 12px; margin-bottom: 15px; 
             box-shadow: 0 8px 25px rgba(0,0,0,0.1); border: 3px solid #90caf9; 
@@ -444,7 +450,6 @@ HTML_PAGE = '''
         .summary-table .col-appr { color: #2e7d32; }
         .summary-table .col-rej { color: #c62828; }
 
-        /* Vibrant Counters */
         .counters { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: nowrap; }
         .counter-box { 
             flex: 1; min-width: 0; padding: 10px 5px; border-radius: 10px; text-align: center; 
@@ -465,7 +470,6 @@ HTML_PAGE = '''
         .counter-label { display: block; font-size: 9px; font-weight: 900; color: #ffffff; margin-bottom: 2px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);}
         .counter-value { display: block; font-size: 20px; font-weight: 900; color: #ffffff; text-shadow: 1px 1px 2px rgba(0,0,0,0.4);}
 
-        /* Vibrant Tabs */
         .tabs { display: flex; width: 100%; margin-bottom: 0; border-radius: 8px 8px 0 0; overflow: hidden; border-bottom: none; background: #e0e0e0;}
         .tab-btn { 
             flex: 1; padding: 10px 2px; text-align: center; border: none; font-weight: 900; 
@@ -508,11 +512,9 @@ HTML_PAGE = '''
 <body>
 
     <div class="container">
-        <!-- Unified Display: Title + Student ID + Live Status -->
         <div class="unified-display">
             <h4 class="main-title">Trending Academy Limited</h4>
             
-            <!-- Student ID Area (Input or Title) -->
             <div class="sid-area" id="sidInputGroup">
                 <input type="text" id="studentId" class="student-id-input" placeholder="Student ID / Name" maxlength="20" oninput="updateSidState()">
             </div>
@@ -520,7 +522,6 @@ HTML_PAGE = '''
                 <div class="sid-title" id="sidTitleText">Student ID</div>
             </div>
 
-            <!-- Live Status Area -->
             <div class="status-area">
                 <div id="welcomeMsg" class="welcome-msg">🖥️ Welcome to Live Projects</div>
                 
@@ -533,14 +534,12 @@ HTML_PAGE = '''
                 <div class="copied-msg" id="copyMsg">✔ Copied</div>
             </div>
 
-            <!-- Action Row: Get Username + Edit/Lock Icon -->
             <div class="action-row">
                 <button id="btnAll2FA" class="send-all-2fa-btn" onclick="startAutoSequence(true)">Get Username</button>
                 <div class="sid-lock-btn-small" id="sidLockToggleBtn" onclick="toggleSidLock()" title="Lock/Unlock ID">🔒</div>
             </div>
         </div>
 
-        <!-- Manual Submit Area -->
         <div class="manual-area">
             <h4>Cookies Submit Please</h4>
             <div class="manual-input-group">
@@ -557,7 +556,6 @@ HTML_PAGE = '''
             </div>
         </div>
 
-        <!-- Report Analytics Area -->
         <div class="report-area">
             <div class="report-header-row">
                 <h4>📊 Report Analytics</h4>
@@ -1466,7 +1464,15 @@ def send_2fa():
 
 if __name__ == '__main__':
     print("Connecting..")
-    client.start()
-    print("Success! Website running...")
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False, threaded=False, use_reloader=False)
+    
+    try:
+        client.start()
+        print("Success! Bot Connected...")
+    except Exception as e:
+        print(f"Bot Connection Error: {e}")
+
+    # Render.com পোর্ট অটোমেটিক ডিটেক্ট করবে
+    port = int(os.environ.get("PORT", 5000))
+    print(f"Website running on port: {port}")
+    
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True, use_reloader=False)
